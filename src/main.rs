@@ -1,3 +1,7 @@
+mod encoder;
+mod mode;
+
+use crate::mode::Mode::NUMBER;
 use image::{Rgba, RgbaImage};
 use imageproc::drawing::draw_filled_rect_mut;
 use imageproc::rect::Rect;
@@ -7,10 +11,6 @@ const SIZE: u32 = 500;
 struct Version<'a> {
     key: &'a str,
     module: u32,
-}
-
-enum Mode {
-    NUMBER,
 }
 
 const VERSIONS: [Version; 1] = [Version {
@@ -23,6 +23,8 @@ const BLACK: Rgba<u8> = Rgba([255, 255, 255, 255]);
 
 fn main() {
     let version = &VERSIONS[0];
+    let mode = NUMBER;
+
     let dot_size = SIZE / version.module;
     let mut img = RgbaImage::new(SIZE, SIZE);
     let mut x = 0;

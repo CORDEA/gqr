@@ -1,9 +1,11 @@
-struct Version<'a> {
-    key: &'a str,
-    module: u32,
+pub enum Version {
+    M1,
 }
 
-const VERSIONS: [Version; 1] = [Version {
-    key: "m1",
-    module: 11,
-}];
+impl Version {
+    pub fn module(&self) -> u16 {
+        return match self {
+            Self::M1 => 11,
+        };
+    }
+}

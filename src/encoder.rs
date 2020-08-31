@@ -7,18 +7,21 @@ use reed_solomon::Encoder;
 pub struct EncodeError {}
 
 pub fn encode(version: &Version, mode: &Mode, data: &str) -> Result<BitVec, EncodeError> {
-    let ecc = calc_ecc(version, data);
-    match mode {
+    let mut d = match mode {
         Mode::NUMBER => match encode_number(version, data) {
-            Ok(d) => Ok(d),
-            Err(e) => Err(e),
+            Ok(d) => d,
+            Err(e) => return Err(e),
         },
-    }
+    };
+    let ecc = calc_ecc(version, &d);
+    d.extend(ecc);
+    Ok(d)
 }
 
-fn calc_ecc(version: &Version, data: &str) -> String {
-    // let ecc = Encoder::new(ecc_len(version)).encode(data.as_bytes()).ecc();
-    return String::new();
+fn calc_ecc(version: &Version, data: &BitVec) -> BitVec<Msb0, u8> {
+    let enc = Encoder::new(ecc_len(version));
+    let v = data.iter().map(|x| *x as u8).collect::<Vec<_>>();
+    return enc.encode(&v).ecc().bits::<Msb0>().to_vec();
 }
 
 fn encode_number(version: &Version, number: &str) -> Result<BitVec, EncodeError> {

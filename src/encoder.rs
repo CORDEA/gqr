@@ -1,90 +1,75 @@
 use crate::mode::Mode;
 use crate::version::Version;
+use bitvec::prelude::*;
+use bitvec::vec::BitVec;
 use reed_solomon::Encoder;
 
 pub struct EncodeError {}
 
-pub fn encode(version: &Version, mode: &Mode, data: &str) -> Result<String, EncodeError> {
+pub fn encode(version: &Version, mode: &Mode, data: &str) -> Result<BitVec, EncodeError> {
     let ecc = calc_ecc(version, data);
     match mode {
         Mode::NUMBER => match encode_number(version, data) {
-            Ok(d) => Ok(format!("{}{}", fill(version, d), ecc)),
+            Ok(d) => Ok(d),
             Err(e) => Err(e),
         },
     }
 }
 
 fn calc_ecc(version: &Version, data: &str) -> String {
-    Encoder::new(ecc_len(version))
-        .encode(data.as_bytes())
-        .ecc()
-        .iter()
-        .map(|c| format!("{:8b}", c))
-        .collect::<Vec<_>>()
-        .concat()
+    // let ecc = Encoder::new(ecc_len(version)).encode(data.as_bytes()).ecc();
+    return String::new();
 }
 
-fn encode_number(version: &Version, number: &str) -> Result<String, EncodeError> {
+fn encode_number(version: &Version, number: &str) -> Result<BitVec, EncodeError> {
+    let mut data: BitVec<Msb0, u16> = BitVec::new();
     let mut i = 0;
-    let mut data = Vec::new();
     loop {
         if number.len() <= i {
             break;
         }
-        let n: &str = match number.get(i..i + 3) {
+        let sn: &str = match number.get(i..i + 3) {
             Some(n) => n,
             None => number.get(i..).unwrap(),
         };
-        match number_to_bits(n) {
-            Ok(bits) => data.push(bits),
+        match number_to_bits(sn) {
+            Ok(b) => data.extend(b),
             Err(e) => return Err(e),
-        };
+        }
         i += 3;
     }
 
-    let len = format!("{:b}", number.len());
-    let pad = (0..(number_of_char_indicators(version) - len.len() as u16))
-        .map(|_| "0")
-        .collect::<Vec<_>>()
-        .concat();
-    return Ok(format!(
-        "{}{}{}{}",
-        number_indicator(version),
-        pad,
-        len,
-        data.concat()
-    ));
+    let len = number.len();
+    let mut res = number_indicator(version);
+    let mut ind = len.bits::<Lsb0>().to_vec();
+    ind.truncate(number_of_char_indicators(version));
+    ind.reverse();
+    res.extend(ind);
+    res.extend(data);
+    return Ok(res);
 }
 
-fn fill(version: &Version, data: String) -> String {
-    let len = data_bits(version);
-    format!(
-        "{}{}",
-        data,
-        (0..len - data.len())
-            .map(|_| "0")
-            .collect::<Vec<_>>()
-            .concat()
-    )
-}
-
-fn number_to_bits(number: &str) -> Result<String, EncodeError> {
-    let n: u16 = number.parse().unwrap();
-    return match number.len() {
-        1 => Ok(format!("{:04b}", n)),
-        2 => Ok(format!("{:07b}", n)),
-        3 => Ok(format!("{:010b}", n)),
-        _ => Err(EncodeError {}),
+fn number_to_bits(number: &str) -> Result<BitVec<Lsb0, u16>, EncodeError> {
+    let len = match number.len() {
+        1 => 4,
+        2 => 7,
+        3 => 10,
+        _ => return Err(EncodeError {}),
     };
+    let n: u16 = number.parse().unwrap();
+    let mut bits = n.bits::<Lsb0>().to_vec();
+    bits.truncate(len);
+    bits.reverse();
+    return Ok(bits);
 }
 
-fn number_indicator(version: &Version) -> String {
+fn number_indicator(version: &Version) -> BitVec {
     match version {
-        Version::M1 => String::new(),
+        Version::M1 => BitVec::new(),
     }
 }
 
-fn number_of_char_indicators(version: &Version) -> u16 {
+fn number_of_char_indicators(version: &Version) -> usize {
     match version {
         Version::M1 => 3,
     }
@@ -96,7 +81,7 @@ fn ecc_len(version: &Version) -> usize {
     }
 }
 
-fn data_bits(version: &Version) -> usize {
+fn data_size(version: &Version) -> usize {
     match version {
         Version::M1 => 20,
     }

@@ -1,12 +1,27 @@
 use crate::mode::Mode;
 use crate::version::Version;
+use reed_solomon::Encoder;
 
 pub struct EncodeError {}
 
 pub fn encode(version: &Version, mode: &Mode, data: &str) -> Result<String, EncodeError> {
-    return match mode {
-        Mode::NUMBER => encode_number(version, data),
-    };
+    let ecc = calc_ecc(version, data);
+    match mode {
+        Mode::NUMBER => match encode_number(version, data) {
+            Ok(d) => Ok(format!("{}{}", fill(version, d), ecc)),
+            Err(e) => Err(e),
+        },
+    }
+}
+
+fn calc_ecc(version: &Version, data: &str) -> String {
+    Encoder::new(ecc_len(version))
+        .encode(data.as_bytes())
+        .ecc()
+        .iter()
+        .map(|c| format!("{:8b}", c))
+        .collect::<Vec<_>>()
+        .concat()
 }
 
 fn encode_number(version: &Version, number: &str) -> Result<String, EncodeError> {
@@ -41,25 +56,48 @@ fn encode_number(version: &Version, number: &str) -> Result<String, EncodeError>
     ));
 }
 
+fn fill(version: &Version, data: String) -> String {
+    let len = data_bits(version);
+    format!(
+        "{}{}",
+        data,
+        (0..len - data.len())
+            .map(|_| "0")
+            .collect::<Vec<_>>()
+            .concat()
+    )
+}
+
 fn number_to_bits(number: &str) -> Result<String, EncodeError> {
     let n: u16 = number.parse().unwrap();
-    let result = match number.len() {
+    return match number.len() {
         1 => Ok(format!("{:04b}", n)),
         2 => Ok(format!("{:07b}", n)),
         3 => Ok(format!("{:010b}", n)),
         _ => Err(EncodeError {}),
     };
-    return result;
 }
 
 fn number_indicator(version: &Version) -> String {
-    return match version {
+    match version {
         Version::M1 => String::new(),
-    };
+    }
 }
 
 fn number_of_char_indicators(version: &Version) -> u16 {
-    return match version {
+    match version {
         Version::M1 => 3,
-    };
+    }
+}
+
+fn ecc_len(version: &Version) -> usize {
+    match version {
+        Version::M1 => 2,
+    }
+}
+
+fn data_bits(version: &Version) -> usize {
+    match version {
+        Version::M1 => 20,
+    }
 }

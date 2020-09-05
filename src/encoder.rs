@@ -13,9 +13,14 @@ pub fn encode(version: &Version, mode: &Mode, data: &str) -> Result<BitVec, Enco
             Err(e) => return Err(e),
         },
     };
+    pad(version, &mut d);
     let ecc = calc_ecc(version, &d);
     d.extend(ecc);
     Ok(d)
+}
+
+fn pad(version: &Version, data: &mut BitVec) {
+    data.resize(data_size(version), false);
 }
 
 fn calc_ecc(version: &Version, data: &BitVec) -> BitVec<Msb0, u8> {
